@@ -1,6 +1,6 @@
 import { app, BrowserWindow, ipcMain, shell, clipboard } from 'electron'
 import path from 'path'
-import { createTray, updateTrayIcon, setTrayTitle } from './tray'
+import { createTray, updateTrayIcon, setTrayTitle, destroyOffscreenWindow } from './tray'
 import { scanPorts, killProcess } from './port-scanner'
 import { getPreferences, setPreferences, initPreferences } from './preferences'
 
@@ -67,18 +67,19 @@ function toggleWindow() {
   }
 }
 
-function getBpmInterval(count) {
-  if (count === 0) return 2000
-  if (count <= 2) return 900
-  if (count <= 4) return 450
-  if (count <= 7) return 220
-  return 110
+// Frame interval for cat Lottie tray icon (base = 40ms at 25fps)
+function getTrayFrameInterval(count) {
+  if (count === 0) return 500   // very slow idle
+  if (count <= 2) return 120    // slow
+  if (count <= 4) return 60     // normal
+  if (count <= 7) return 35     // fast
+  return 20                     // turbo
 }
 
 function startAnimation() {
   if (animationInterval) clearInterval(animationInterval)
 
-  const speed = getBpmInterval(currentPorts.length)
+  const speed = getTrayFrameInterval(currentPorts.length)
   animationInterval = setInterval(() => {
     frame++
     updateTrayIcon(tray, currentPorts.length, frame)
@@ -145,13 +146,25 @@ function setupIPC() {
 
 app.dock?.hide()
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
   initPreferences()
   createWindow()
-  tray = createTray(toggleWindow)
+  tray = await createTray(toggleWindow)
   setupIPC()
-  startScanning()
+  await startScanning()
   startAnimation()
+})
+
+app.on('before-quit', () => {
+  if (scanInterval) {
+    clearInterval(scanInterval)
+    scanInterval = null
+  }
+  if (animationInterval) {
+    clearInterval(animationInterval)
+    animationInterval = null
+  }
+  destroyOffscreenWindow()
 })
 
 app.on('window-all-closed', (e) => {

@@ -2,7 +2,9 @@ const { contextBridge, ipcRenderer } = require('electron')
 
 contextBridge.exposeInMainWorld('portband', {
   onPortsUpdate: (callback) => {
-    ipcRenderer.on('ports-update', (_, data) => callback(data))
+    const handler = (_, data) => callback(data)
+    ipcRenderer.on('ports-update', handler)
+    return () => ipcRenderer.removeListener('ports-update', handler)
   },
   killProcess: (pid) => ipcRenderer.invoke('kill-process', pid),
   killAll: (pids) => ipcRenderer.invoke('kill-all', pids),

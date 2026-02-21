@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { memo } from 'react'
 import { SvgIcon, ExternalLinkIcon, CopyIcon, CheckIcon, XIcon } from '../lib/icons'
 
 const btnStyle = {
@@ -14,7 +14,7 @@ const btnStyle = {
   padding: 0
 }
 
-export default function PortRow({ port, onKill, onOpen, onCopy, killing, justCopied }) {
+function PortRow({ port, onKill, onOpen, onCopy, killing, justCopied }) {
   const isCopied = justCopied === port.id
 
   return (
@@ -78,3 +78,14 @@ export default function PortRow({ port, onKill, onOpen, onCopy, killing, justCop
     </div>
   )
 }
+
+export default memo(PortRow, (prev, next) => {
+  return (
+    prev.port === next.port &&
+    prev.killing === next.killing &&
+    prev.justCopied === next.justCopied &&
+    prev.onKill === next.onKill &&
+    prev.onOpen === next.onOpen &&
+    prev.onCopy === next.onCopy
+  )
+})

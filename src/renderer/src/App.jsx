@@ -1,38 +1,31 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import BandStage from './components/BandStage'
 import PortRow from './components/PortRow'
 import LivePulse from './components/LivePulse'
 import Settings from './components/Settings'
 import { SettingsIcon } from './lib/icons'
-import { getBpmInterval } from './lib/constants'
 
 export default function App() {
   const [ports, setPorts] = useState([])
   const [killingId, setKillingId] = useState(null)
   const [copied, setCopied] = useState(null)
-  const [frame, setFrame] = useState(0)
   const [view, setView] = useState('main') // 'main' | 'settings'
   const [showKillAll, setShowKillAll] = useState(false)
 
   const count = ports.length
-  const speed = getBpmInterval(count)
-
-  // Animation timer
-  useEffect(() => {
-    const iv = setInterval(() => setFrame((f) => f + 1), speed)
-    return () => clearInterval(iv)
-  }, [speed])
 
   // Listen for port updates from main process
   useEffect(() => {
-    if (window.portband) {
-      window.portband.onPortsUpdate((data) => {
-        setPorts(data)
-      })
+    if (!window.portband) return
+    const unsub = window.portband.onPortsUpdate((data) => {
+      setPorts(data)
+    })
+    return () => {
+      if (typeof unsub === 'function') unsub()
     }
   }, [])
 
-  const handleKill = (port) => {
+  const handleKill = useCallback((port) => {
     setKillingId(port.id)
     if (window.portband) {
       window.portband.killProcess(port.pid)
@@ -41,29 +34,29 @@ export default function App() {
       setPorts((p) => p.filter((x) => x.id !== port.id))
       setKillingId(null)
     }, 400)
-  }
+  }, [])
 
-  const handleOpen = (port) => {
+  const handleOpen = useCallback((port) => {
     if (window.portband) {
       window.portband.openInBrowser(port.port)
     }
-  }
+  }, [])
 
-  const handleCopy = (port) => {
+  const handleCopy = useCallback((port) => {
     if (window.portband) {
       window.portband.copyUrl(port.port)
     }
     setCopied(port.id)
     setTimeout(() => setCopied(null), 1500)
-  }
+  }, [])
 
-  const handleKillAll = () => {
+  const handleKillAll = useCallback(() => {
     if (window.portband) {
       window.portband.killAll(ports.map((p) => p.pid))
     }
     setPorts([])
     setShowKillAll(false)
-  }
+  }, [ports])
 
   if (view === 'settings') {
     return (
@@ -163,7 +156,7 @@ export default function App() {
         <>
           {/* Band Stage */}
           <div style={{ padding: '0 8px 8px' }}>
-            <BandStage count={count} frame={frame} />
+            <BandStage count={count} />
           </div>
 
           {/* Separator */}

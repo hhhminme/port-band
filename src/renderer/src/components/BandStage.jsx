@@ -1,34 +1,99 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useMemo, useRef, useEffect, useCallback, memo } from 'react'
 import Stickman from './Stickman'
-import { getBpmLabel } from '../lib/constants'
+import { getBpmLabel, getBpmSpeed } from '../lib/constants'
 
-function DraggableStick({ index, frame, size, initX, initY, stageRef }) {
-  const [pos, setPos] = useState({ x: initX, y: initY })
-  const dragging = useRef(false)
-  const offset = useRef({ x: 0, y: 0 })
+// Seed-based deterministic positioning
+function seed(i) {
+  let s = (i + 1) * 7919
+  s = ((s * 1103515245 + 12345) >>> 0) % 1000
+  return s / 1000
+}
 
-  const onDown = (e) => {
-    e.preventDefault()
-    dragging.current = true
-    const rect = stageRef.current.getBoundingClientRect()
-    const cX = e.touches ? e.touches[0].clientX : e.clientX
-    const cY = e.touches ? e.touches[0].clientY : e.clientY
-    offset.current = { x: cX - rect.left - pos.x, y: cY - rect.top - pos.y }
-  }
+const DraggableStick = memo(function DraggableStick({ index, size, speed, initX, initY }) {
+  return (
+    <div
+      data-stick={index}
+      style={{
+        position: 'absolute',
+        left: initX,
+        top: initY,
+        cursor: 'grab',
+        zIndex: Math.round(initY)
+      }}
+    >
+      <Stickman index={index} size={size} speed={speed} />
+    </div>
+  )
+}, (prev, next) => {
+  return prev.index === next.index && prev.size === next.size && prev.speed === next.speed && prev.initX === next.initX && prev.initY === next.initY
+})
 
-  useEffect(() => {
-    const onMove = (e) => {
-      if (!dragging.current || !stageRef.current) return
+export default function BandStage({ count }) {
+  const stageRef = useRef(null)
+  const [showHint, setShowHint] = useState(true)
+  const draggingRef = useRef(null) // { el, offsetX, offsetY }
+
+  const sz = useMemo(
+    () => (count <= 5 ? 1 : count <= 10 ? 0.8 : count <= 16 ? 0.6 : count <= 24 ? 0.5 : 0.4),
+    [count]
+  )
+
+  const bpmLabel = useMemo(() => getBpmLabel(count), [count])
+  const speed = useMemo(() => getBpmSpeed(count), [count])
+
+  const positions = useMemo(
+    () =>
+      Array.from({ length: count }, (_, i) => ({
+        x: seed(i) * (280 - 40 * sz) + 5,
+        y: seed(i + 50) * (144 - 60 * sz - 10) + 5
+      })),
+    [count, sz]
+  )
+
+  // Event delegation: single set of listeners on the stage container
+  const onPointerDown = useCallback(
+    (e) => {
+      // Find the closest [data-stick] ancestor
+      const stickEl = e.target.closest('[data-stick]')
+      if (!stickEl || !stageRef.current) return
+      e.preventDefault()
+      setShowHint(false)
+
       const rect = stageRef.current.getBoundingClientRect()
       const cX = e.touches ? e.touches[0].clientX : e.clientX
       const cY = e.touches ? e.touches[0].clientY : e.clientY
-      setPos({
-        x: Math.max(0, Math.min(rect.width - 40 * size, cX - rect.left - offset.current.x)),
-        y: Math.max(0, Math.min(rect.height - 60 * size, cY - rect.top - offset.current.y))
-      })
+      const elLeft = parseFloat(stickEl.style.left) || 0
+      const elTop = parseFloat(stickEl.style.top) || 0
+
+      draggingRef.current = {
+        el: stickEl,
+        offsetX: cX - rect.left - elLeft,
+        offsetY: cY - rect.top - elTop
+      }
+      stickEl.style.cursor = 'grabbing'
+    },
+    []
+  )
+
+  useEffect(() => {
+    const onMove = (e) => {
+      const d = draggingRef.current
+      if (!d || !stageRef.current) return
+      const rect = stageRef.current.getBoundingClientRect()
+      const cX = e.touches ? e.touches[0].clientX : e.clientX
+      const cY = e.touches ? e.touches[0].clientY : e.clientY
+      const newX = Math.max(0, Math.min(rect.width - 40 * sz, cX - rect.left - d.offsetX))
+      const newY = Math.max(0, Math.min(rect.height - 60 * sz, cY - rect.top - d.offsetY))
+      d.el.style.left = newX + 'px'
+      d.el.style.top = newY + 'px'
+      d.el.style.zIndex = Math.round(newY)
     }
     const onUp = () => {
-      dragging.current = false
+      const d = draggingRef.current
+      if (d) {
+        d.el.style.cursor = 'grab'
+        draggingRef.current = null
+      }
     }
     window.addEventListener('mousemove', onMove)
     window.addEventListener('mouseup', onUp)
@@ -40,39 +105,7 @@ function DraggableStick({ index, frame, size, initX, initY, stageRef }) {
       window.removeEventListener('touchmove', onMove)
       window.removeEventListener('touchend', onUp)
     }
-  }, [size, stageRef])
-
-  return (
-    <div
-      onMouseDown={onDown}
-      onTouchStart={onDown}
-      style={{
-        position: 'absolute',
-        left: pos.x,
-        top: pos.y,
-        cursor: 'grab',
-        zIndex: Math.round(pos.y)
-      }}
-    >
-      <Stickman index={index} frame={frame + index} size={size} />
-    </div>
-  )
-}
-
-export default function BandStage({ count, frame }) {
-  const stageRef = useRef(null)
-  const [showHint, setShowHint] = useState(true)
-
-  // Seed-based deterministic positioning
-  const seed = (i) => {
-    let s = (i + 1) * 7919
-    s = ((s * 1103515245 + 12345) >>> 0) % 1000
-    return s / 1000
-  }
-
-  const n = Math.min(count, 8)
-  const sz = n > 5 ? 0.8 : 1
-  const bpmLabel = getBpmLabel(count)
+  }, [sz])
 
   return (
     <div
@@ -83,18 +116,11 @@ export default function BandStage({ count, frame }) {
         borderRadius: 8,
         border: '1px solid #27272a'
       }}
-      onMouseDown={() => setShowHint(false)}
+      onMouseDown={onPointerDown}
+      onTouchStart={onPointerDown}
     >
-      {[...Array(n)].map((_, i) => (
-        <DraggableStick
-          key={i}
-          index={i}
-          frame={frame}
-          size={sz}
-          initX={seed(i) * (260 - 40 * sz) + 10}
-          initY={seed(i + 50) * (70 - 60 * sz) + 10}
-          stageRef={stageRef}
-        />
+      {positions.map((pos, i) => (
+        <DraggableStick key={i} index={i} size={sz} speed={speed} initX={pos.x} initY={pos.y} />
       ))}
       {bpmLabel && (
         <span
@@ -111,7 +137,7 @@ export default function BandStage({ count, frame }) {
           {bpmLabel} BPM
         </span>
       )}
-      {showHint && n > 0 && (
+      {showHint && count > 0 && (
         <span
           style={{
             position: 'absolute',

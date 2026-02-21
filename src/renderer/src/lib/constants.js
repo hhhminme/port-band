@@ -27,12 +27,12 @@ export const colors = {
   }
 }
 
-export function getBpmInterval(count) {
-  if (count === 0) return 2000
-  if (count <= 2) return 900
-  if (count <= 4) return 450
-  if (count <= 7) return 220
-  return 110
+export function getBpmSpeed(count) {
+  if (count === 0) return 1
+  if (count <= 2) return 3
+  if (count <= 4) return 6
+  if (count <= 7) return 9
+  return 12
 }
 
 export function getBpmLabel(count) {

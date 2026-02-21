@@ -1,54 +1,125 @@
-import { Tray, nativeImage } from 'electron'
+import { Tray, nativeImage, BrowserWindow } from 'electron'
+import { readFileSync } from 'fs'
+import { join } from 'path'
+import catAnimation from './cat-animation.json'
 
-function renderTrayIconSvg(count, frame) {
-  const size = 48
-  const cx = size / 2
-  const cy = 30
+let offscreenWindow = null
+let cachedFrames = []
+let totalFrames = 0
 
-  const flip = count === 0 ? 0 : (frame % 2 === 0 ? -1 : 1)
-  const bounce = count === 0 ? 0 : (frame % 2 === 0 ? 0 : 4)
-
-  const hairColor = '#E8485C'
-  const headColor = '#FF6B6B'
-
-  let hairPaths = ''
-  for (let i = -3; i <= 3; i++) {
-    const sx = cx + i * 4
-    const sy = cy - 10 + bounce
-    const cpx = cx + i * 4 + flip * 8
-    const cpy = cy - 24 + Math.abs(i) * 2 + bounce
-    const ex = cx + i * 4 + flip * 14
-    const ey = cy - 32 + Math.abs(i) * 4 + bounce
-    hairPaths += `<path d="M${sx},${sy} Q${cpx},${cpy} ${ex},${ey}" stroke="${hairColor}" stroke-width="3.6" stroke-linecap="round" fill="none"/>`
+async function initOffscreenWindow() {
+  // Read lottie-web source
+  const lottieWebPath = join(
+    __dirname,
+    '../../node_modules/lottie-web/build/player/lottie.min.js'
+  )
+  let lottieJs = ''
+  try {
+    lottieJs = readFileSync(lottieWebPath, 'utf-8')
+  } catch (e) {
+    console.error('[tray] Failed to read lottie-web:', e.message)
+    return
   }
 
-  const headCy = cy + bounce
+  // Build a self-contained HTML page with lottie-web and animation data baked in
+  const animJson = JSON.stringify(catAnimation)
+  const html = `<!DOCTYPE html>
+<html><head><script>${lottieJs}<\/script></head>
+<body>
+<div id="c" style="width:36px;height:36px"></div>
+<script>
+  const anim = lottie.loadAnimation({
+    container: document.getElementById('c'),
+    animationData: ${animJson},
+    renderer: 'canvas',
+    loop: false,
+    autoplay: false
+  });
+  anim.addEventListener('DOMLoaded', () => {
+    // Re-draw each frame onto a 36x36 output canvas for tray icon
+    const srcCanvas = document.querySelector('#c canvas');
+    const out = document.createElement('canvas');
+    out.width = 36;
+    out.height = 36;
+    window.__outCtx = out.getContext('2d');
+    window.__srcCanvas = srcCanvas;
+    window.__outCanvas = out;
+    window.__lottieReady = true;
+    window.__totalFrames = anim.totalFrames;
+    window.__anim = anim;
+  });
+<\/script>
+</body></html>`
 
-  let zzzText = ''
-  if (count === 0) {
-    zzzText = `
-      <text x="36" y="16" fill="#71717a" font-size="14" font-weight="bold" font-family="sans-serif">z</text>
-      <text x="40" y="10" fill="#71717a" font-size="10" font-weight="bold" font-family="sans-serif">z</text>
-    `
+  offscreenWindow = new BrowserWindow({
+    width: 36,
+    height: 36,
+    show: false,
+    webPreferences: {
+      contextIsolation: false,
+      nodeIntegration: false
+    }
+  })
+
+  await offscreenWindow.loadURL(
+    'data:text/html;base64,' + Buffer.from(html).toString('base64')
+  )
+}
+
+async function renderLottieFrames() {
+  if (!offscreenWindow || offscreenWindow.isDestroyed()) return
+
+  // Wait for lottie to be ready
+  const ready = await offscreenWindow.webContents.executeJavaScript(`
+    new Promise(resolve => {
+      if (window.__lottieReady) return resolve(true);
+      const check = setInterval(() => {
+        if (window.__lottieReady) { clearInterval(check); resolve(true); }
+      }, 50);
+      setTimeout(() => { clearInterval(check); resolve(false); }, 5000);
+    })
+  `)
+
+  if (!ready) {
+    console.error('[tray] Lottie did not become ready in time')
+    return
   }
 
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
-    ${hairPaths}
-    <circle cx="${cx}" cy="${headCy}" r="12" fill="${headColor}"/>
-    <circle cx="${cx - 5}" cy="${headCy - 2}" r="2.4" fill="white"/>
-    <circle cx="${cx + 5}" cy="${headCy - 2}" r="2.4" fill="white"/>
-    ${zzzText}
-  </svg>`
+  const frames = await offscreenWindow.webContents.executeJavaScript(`
+    (() => {
+      const results = [];
+      const ctx = window.__outCtx;
+      const src = window.__srcCanvas;
+      const out = window.__outCanvas;
+      for (let i = 0; i < window.__totalFrames; i++) {
+        window.__anim.goToAndStop(i, true);
+        ctx.clearRect(0, 0, 36, 36);
+        ctx.drawImage(src, 0, 0, 36, 36);
+        results.push(out.toDataURL('image/png'));
+      }
+      return results;
+    })()
+  `)
+
+  console.log('[tray] Rendered', frames.length, 'cat frames')
+  cachedFrames = frames.map((dataUrl) => {
+    const img = nativeImage.createFromDataURL(dataUrl)
+    // Resize to 18x18 so macOS treats the 36px source as @2x Retina
+    return img.resize({ width: 18, height: 18 })
+  })
+  totalFrames = cachedFrames.length
 }
 
-function svgToNativeImage(svgString) {
-  const dataUrl = `data:image/svg+xml;base64,${Buffer.from(svgString).toString('base64')}`
-  return nativeImage.createFromDataURL(dataUrl)
-}
+export async function createTray(toggleCallback) {
+  await initOffscreenWindow()
+  try {
+    await renderLottieFrames()
+  } catch (e) {
+    console.error('[tray] renderLottieFrames failed:', e.message)
+  }
 
-export function createTray(toggleCallback) {
-  const svg = renderTrayIconSvg(0, 0)
-  const icon = svgToNativeImage(svg)
+  const icon =
+    cachedFrames.length > 0 ? cachedFrames[0] : nativeImage.createEmpty()
 
   const tray = new Tray(icon)
   tray.setToolTip('PortBand')
@@ -61,18 +132,25 @@ export function createTray(toggleCallback) {
   return tray
 }
 
-export function updateTrayIcon(tray, count, frame) {
+export async function updateTrayIcon(tray, count, frame) {
   if (!tray || tray.isDestroyed()) return
-  try {
-    const svg = renderTrayIconSvg(count, frame)
-    const icon = svgToNativeImage(svg)
-    tray.setImage(icon)
-  } catch (e) {
-    // Ignore rendering errors
+  if (totalFrames === 0) return
+
+  const idx = frame % totalFrames
+  const img = cachedFrames[idx]
+  if (img) {
+    tray.setImage(img)
   }
 }
 
 export function setTrayTitle(tray, count) {
   if (!tray || tray.isDestroyed()) return
   tray.setTitle(` ${count}`)
+}
+
+export function destroyOffscreenWindow() {
+  if (offscreenWindow && !offscreenWindow.isDestroyed()) {
+    offscreenWindow.destroy()
+    offscreenWindow = null
+  }
 }
