@@ -14,31 +14,37 @@ export const colors = {
   },
 
   accent: {
-    green: '#34d399',
-    greenBg: 'rgba(52,211,153,0.1)',
-    greenBorder: 'rgba(52,211,153,0.2)',
+    fire: '#FB923C',
+    fireBg: 'rgba(251,146,60,0.1)',
+    fireBorder: 'rgba(251,146,60,0.2)',
+    ember: '#F59E0B',
+    gold: '#FBBF24',
     red: '#ef4444',
     redHover: '#dc2626'
   },
 
-  stickman: {
-    body: ['#FF6B6B', '#4ECDC4', '#9B59B6', '#F1C40F', '#3498DB', '#E67E22', '#1ABC9C', '#EC407A'],
-    hair: ['#E8485C', '#5BC0EB', '#9B5DE5', '#F15BB5', '#FEE440', '#00BBF9', '#00F5D4', '#FF6F61']
+  scene: {
+    ground: '#292017',
+    logBrown: '#5C3D1E',
+    flame1: '#FF6B00',
+    flame2: '#FFB800',
+    flame3: '#FFF4CC',
+    spark: '#FFD700'
   }
 }
 
-export function getBpmSpeed(count) {
+export function getCampSpeed(count) {
   if (count === 0) return 1
-  if (count <= 2) return 3
-  if (count <= 4) return 6
-  if (count <= 7) return 9
-  return 12
+  if (count <= 2) return 1.5
+  if (count <= 4) return 2
+  if (count <= 7) return 2.5
+  return 3
 }
 
-export function getBpmLabel(count) {
+export function getCampState(count) {
   if (count === 0) return null
-  if (count <= 2) return '~60'
-  if (count <= 4) return '~120'
-  if (count <= 7) return '~180'
-  return '~240'
+  if (count <= 2) return 'Quiet Camp'
+  if (count <= 4) return 'Active Camp'
+  if (count <= 7) return 'Busy Camp'
+  return 'Festival'
 }

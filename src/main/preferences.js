@@ -11,9 +11,17 @@ const defaults = {
 export function initPreferences() {
   try {
     store = new Store({
-      name: 'portband-preferences',
+      name: 'portparty-preferences',
       defaults
     })
+
+    // Clean up legacy settings
+    if (store.has('anthropicApiKey')) {
+      store.delete('anthropicApiKey')
+    }
+    if (store.has('chatProvider')) {
+      store.delete('chatProvider')
+    }
   } catch (e) {
     console.error('Failed to initialize electron-store:', e)
     store = null

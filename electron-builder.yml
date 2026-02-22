@@ -1,8 +1,11 @@
-appId: com.portband.app
-productName: PortBand
+appId: com.portparty.app
+productName: PortParty
 directories:
   buildResources: build
   output: dist
+extraResources:
+  - from: src/mcp/server.mjs
+    to: mcp/server.mjs
 files:
   - '!**/.vscode/*'
   - '!src/*'
@@ -19,7 +22,7 @@ mac:
   entitlements: build/entitlements.mac.plist
   entitlementsInherit: build/entitlements.mac.plist
 dmg:
-  title: PortBand
+  title: PortParty
   iconSize: 80
   contents:
     - x: 130

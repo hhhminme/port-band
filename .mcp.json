@@ -1,6 +1,6 @@
 {
   "mcpServers": {
-    "portband": {
+    "portparty": {
       "command": "node",
       "args": ["src/mcp/server.mjs"]
     }

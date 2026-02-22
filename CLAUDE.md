@@ -1,14 +1,14 @@
-# PortBand — Project Rules
+# PortParty — Project Rules
 
 ## Overview
-macOS menu bar app that monitors TCP listening ports and shows animated cat Lottie characters that headbang faster as more ports are active.
+macOS menu bar app that monitors TCP listening ports and shows pixel art RPG adventurers gathering around a campfire. As more ports become active, more characters arrive and the fire grows brighter.
 
 ## Tech Stack
 - Electron 28+ (electron-vite)
 - React 18 + Vite (renderer)
 - Tailwind CSS v4 + shadcn/ui style components (dark mode only)
-- `@lottiefiles/dotlottie-react` (renderer — cat animation)
-- `lottie-web` (main process — tray icon frame pre-rendering)
+- Canvas-based pixel art rendering (renderer — campfire scene + characters)
+- Offscreen BrowserWindow + canvas (main process — tray icon frame pre-rendering)
 - electron-store (preferences)
 - lsof for port scanning (no sudo needed)
 
@@ -23,29 +23,45 @@ macOS menu bar app that monitors TCP listening ports and shows animated cat Lott
 
 ## Animation Architecture
 
-### Renderer (BandStage + Stickman)
-- `.lottie` (dotLottie zip format) loaded via `@lottiefiles/dotlottie-react`
-- Import as URL: `import catSrc from '../assets/loader-cat.lottie?url'`
-- Speed controlled via `dotLottieRefCallback` → `setSpeed(n)`
-- `getBpmSpeed(count)` returns multiplier: 1x (idle) / 3x / 6x / 9x / 12x
+### Renderer (CampfireScene)
+- Canvas-based pixel art drawn at 160x72, CSS-scaled to 320x144 with `image-rendering: pixelated`
+- Characters defined as 8x10 pixel grid sprites in `CharacterSprite.js`
+- Fire rendered procedurally with pixel-art flame shapes in `CampfireRenderer.js`
+- Spark particle system (1px gold dots floating upward)
+- Characters positioned in semicircular arc around campfire
+- `getCampSpeed(count)` returns animation multiplier
+- `getCampState(count)` returns label: "Quiet Camp" / "Active Camp" / "Busy Camp" / "Festival"
+
+### Character Class Mapping (service → RPG class)
+| Service | Class | Color |
+|---------|-------|-------|
+| Node.js | Ranger | `#5FA04E` |
+| Python | Wizard | `#3776AB` |
+| PostgreSQL | Paladin | `#4169E1` |
+| Redis | Rogue | `#FF4438` |
+| Docker | Sailor | `#2496ED` |
+| Vite | Lightning Mage | `#646CFF` |
+| Next.js | Dark Knight | `#555555` |
+| Go | Monk | `#00ADD8` |
+| Rust | Blacksmith | `#DEA584` |
+| Generic | Adventurer | `#71717a` |
 
 ### Tray Icon (main process)
-- Offscreen `BrowserWindow` (hidden, 36x36) loads self-contained HTML
-- `lottie-web` source injected inline via `readFileSync` from node_modules
-- Cat animation JSON (`cat-animation.json`) baked into the HTML
-- All frames pre-rendered to canvas at startup → cached as `nativeImage` array
+- Offscreen `BrowserWindow` (hidden, 36x36) loads self-contained HTML with canvas
+- Campfire pixel art drawn programmatically (no external animation libraries)
+- 5 intensity levels × 4 frames = 20 frames pre-rendered at startup
 - Frames resized to 18x18pt for macOS Retina @2x compatibility
-- `updateTrayIcon(tray, count, frame)` cycles through cached frames
-- Frame interval controlled by `getTrayFrameInterval(count)`: 500ms (idle) → 20ms (turbo)
+- `updateTrayIcon(tray, count, frame)` selects intensity from count, cycles frames
+- Frame interval controlled by `getTrayFrameInterval(count)`: 1000ms (idle) → 100ms (blaze)
 
-### BPM Sync
-| Port Count | BPM Label | Renderer Speed | Tray Interval |
-|-----------|-----------|---------------|--------------|
-| 0         | —         | 1x            | 500ms        |
-| 1-2       | ~60       | 3x            | 120ms        |
-| 3-4       | ~120      | 6x            | 60ms         |
-| 5-7       | ~180      | 9x            | 35ms         |
-| 8+        | ~240      | 12x           | 20ms         |
+### Camp State Sync
+| Port Count | Camp State | Tray Interval |
+|-----------|-----------|--------------|
+| 0         | —         | 1000ms       |
+| 1-2       | Quiet Camp | 300ms       |
+| 3-4       | Active Camp | 200ms      |
+| 5-7       | Busy Camp  | 150ms       |
+| 8+        | Festival   | 100ms       |
 
 ## Design Tokens
 
@@ -58,55 +74,67 @@ text.secondary: #e4e4e7 (zinc-200)
 text.tertiary: #71717a (zinc-500)
 text.muted:   #52525b  (zinc-600)
 text.ghost:   #3f3f46  (zinc-700)
-accent.green: #34d399  (emerald-400)
+accent.fire:  #FB923C  (orange-400)
+accent.ember: #F59E0B  (amber-500)
+accent.gold:  #FBBF24  (amber-400)
 accent.red:   #ef4444  (red-500)
+scene.ground: #292017  (dark warm brown)
+scene.flame1: #FF6B00  (outer flame)
+scene.flame2: #FFB800  (mid flame)
+scene.flame3: #FFF4CC  (inner flame core)
+scene.spark:  #FFD700  (sparks)
 ```
 
 ## Project Structure
 ```
 src/main/index.js              — Electron main process + animation loop
-src/main/tray.js               — Tray icon (Lottie offscreen rendering)
-src/main/cat-animation.json    — Cat Lottie JSON (extracted from .lottie)
+src/main/tray.js               — Tray icon (canvas-based campfire rendering)
 src/main/port-scanner.js       — lsof execution + parsing
 src/main/preferences.js        — electron-store settings
-src/preload/index.js           — contextBridge IPC bridge
+src/preload/index.js           — contextBridge IPC bridge (window.portparty)
 src/renderer/src/App.jsx       — Main React component
-src/renderer/src/assets/       — loader-cat.lottie (dotLottie for renderer)
-src/renderer/src/components/   — BandStage, Stickman, PortRow, etc.
-src/renderer/src/lib/          — Icons, constants (getBpmSpeed, getBpmLabel)
+src/renderer/src/components/CampfireScene.jsx   — Canvas campfire scene
+src/renderer/src/components/CampfireRenderer.js — Fire, sparks, glow, ground rendering
+src/renderer/src/components/CharacterSprite.js  — Pixel art character definitions
+src/renderer/src/components/PortRow.jsx         — Port list row
+src/renderer/src/components/Settings.jsx        — Camp Settings page
+src/renderer/src/components/LivePulse.jsx       — Amber pulse indicator
+src/renderer/src/lib/constants.js               — Colors, getCampSpeed, getCampState
+src/renderer/src/lib/icons.jsx                  — SVG icons (Simple Icons + Lucide)
+src/mcp/server.mjs                              — MCP server for Claude Code
 ```
 
 ## Key Lessons & Gotchas
 
-### dotLottie vs Lottie JSON
-- `.lottie` files are zip archives (not JSON). Need `@lottiefiles/dotlottie-react` or `@lottiefiles/dotlottie-web` to play them.
-- `lottie-react` (based on `lottie-web`) only accepts raw JSON, not `.lottie` zip.
-- To use both formats: renderer uses dotLottie, main process uses extracted JSON from the zip.
-- Extract JSON: `unzip file.lottie` → `animations/*.json`
+### Pixel Art Canvas Rendering
+- Draw at low resolution (160x72), CSS-scale up with `image-rendering: pixelated`
+- Use integer coordinates and `fillRect` for crisp pixel edges
+- Characters are 8x10 pixel grids with color-mapped palette indices
 
 ### Tray Icon Sizing on macOS
 - macOS menu bar icons must be ~18x18pt (36x36px @2x Retina)
 - Rendering at larger sizes (48x48) makes icons appear oversized
 - Use `nativeImage.resize({ width: 18, height: 18 })` after rendering at 2x
 
-### Offscreen Lottie Rendering in Electron
-- CDN loading in offscreen `BrowserWindow` may fail (network/CSP issues)
-- Inject `lottie-web` source directly via `readFileSync` + inline `<script>` tag
+### Offscreen Canvas Rendering in Electron
+- Offscreen `BrowserWindow` with canvas for tray frame generation
 - Load HTML via `data:text/html;base64,...` data URL
 - Set `contextIsolation: false` on the offscreen window (not user-facing)
-- Pre-render ALL frames at startup and cache as `nativeImage[]` — avoid per-frame rendering
+- Pre-render ALL frames at startup and cache as `nativeImage[]`
 
 ### Vite + electron-vite Bundling
 - `__dirname` in main process resolves to `out/main/` after build
-- `readFileSync` with `__dirname`-relative paths works at runtime
 - JSON imports (`import x from './file.json'`) are inlined by Vite
-- `.lottie` files in renderer: use `?url` suffix for Vite asset URL import
+
+## RPG Theme Copy
+- Header: "PortParty" + badge "Party of N"
+- Footer: "Campfire burning" (active) / "Embers cooling" (idle)
+- Empty state: "Camp is quiet..." (shown in campfire scene)
+- Kill All: "Break Camp" button → dialog "Break camp?" / "Dismiss all N adventurers?"
+- Settings: "Camp Settings"
+- IPC bridge: `window.portparty`
 
 ## Commands
 - `npm run dev` — Development with HMR
 - `npm run build` — Production build
 - `npm run build:mac` — Build macOS DMG
-
-## Design References
-- `docs/portband-dev-spec.md` — Full technical specification
-- `docs/portband-mockup.jsx` — Design mockup (confirmed)

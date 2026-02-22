@@ -1,6 +1,6 @@
 const { contextBridge, ipcRenderer } = require('electron')
 
-contextBridge.exposeInMainWorld('portband', {
+contextBridge.exposeInMainWorld('portparty', {
   onPortsUpdate: (callback) => {
     const handler = (_, data) => callback(data)
     ipcRenderer.on('ports-update', handler)

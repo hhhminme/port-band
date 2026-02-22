@@ -67,13 +67,13 @@ function toggleWindow() {
   }
 }
 
-// Frame interval for cat Lottie tray icon (base = 40ms at 25fps)
+// Frame interval for campfire tray icon animation
 function getTrayFrameInterval(count) {
-  if (count === 0) return 500   // very slow idle
-  if (count <= 2) return 120    // slow
-  if (count <= 4) return 60     // normal
-  if (count <= 7) return 35     // fast
-  return 20                     // turbo
+  if (count === 0) return 1000   // slow ember drift
+  if (count <= 2) return 300     // gentle flicker
+  if (count <= 4) return 200     // moderate
+  if (count <= 7) return 150     // active fire
+  return 100                     // vigorous blaze
 }
 
 function startAnimation() {
@@ -142,6 +142,7 @@ function setupIPC() {
     startScanning()
     return getPreferences()
   })
+
 }
 
 app.dock?.hide()
@@ -151,11 +152,12 @@ app.whenReady().then(async () => {
   createWindow()
   tray = await createTray(toggleWindow)
   setupIPC()
+
   await startScanning()
   startAnimation()
 })
 
-app.on('before-quit', () => {
+app.on('before-quit', async () => {
   if (scanInterval) {
     clearInterval(scanInterval)
     scanInterval = null

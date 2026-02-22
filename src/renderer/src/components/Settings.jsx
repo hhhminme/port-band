@@ -33,21 +33,21 @@ export default function Settings({ onBack }) {
   const [prefs, setPrefs] = useState({ openAtLogin: false, scanInterval: 2 })
 
   useEffect(() => {
-    if (window.portband) {
-      window.portband.getPreferences().then(setPrefs)
+    if (window.portparty) {
+      window.portparty.getPreferences().then(setPrefs)
     }
   }, [])
 
   const updatePref = (key, value) => {
     const next = { ...prefs, [key]: value }
     setPrefs(next)
-    if (window.portband) {
-      window.portband.setPreferences({ [key]: value })
+    if (window.portparty) {
+      window.portparty.setPreferences({ [key]: value })
     }
   }
 
   return (
-    <div style={{ background: '#18181b', minHeight: '100%' }}>
+    <div style={{ background: '#18181b', flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
       {/* Header */}
       <div
         style={{
@@ -72,11 +72,11 @@ export default function Settings({ onBack }) {
           <ArrowLeftIcon size={14} />
         </button>
         <span style={{ fontSize: 14, fontWeight: 600, color: '#fafafa', marginLeft: 8 }}>
-          Settings
+          Camp Settings
         </span>
       </div>
 
-      <div style={{ padding: '12px 16px' }}>
+      <div style={{ padding: '12px 16px', flex: 1, overflowY: 'auto', minHeight: 0 }}>
         {/* Open at Login */}
         <div
           style={{
@@ -103,7 +103,7 @@ export default function Settings({ onBack }) {
                 left: 0,
                 right: 0,
                 bottom: 0,
-                backgroundColor: prefs.openAtLogin ? '#34d399' : '#3f3f46',
+                backgroundColor: prefs.openAtLogin ? '#FB923C' : '#3f3f46',
                 borderRadius: 10,
                 transition: 'background-color 0.2s'
               }}
@@ -147,7 +147,7 @@ export default function Settings({ onBack }) {
                   borderRadius: 4,
                   border: 'none',
                   cursor: 'pointer',
-                  background: prefs.scanInterval === opt.value ? '#34d399' : '#27272a',
+                  background: prefs.scanInterval === opt.value ? '#FB923C' : '#27272a',
                   color: prefs.scanInterval === opt.value ? '#09090b' : '#71717a',
                   transition: 'all 0.15s'
                 }}
@@ -173,10 +173,10 @@ export default function Settings({ onBack }) {
           </span>
           <div style={{ marginTop: 8 }}>
             <p style={{ fontSize: 11, color: '#71717a', lineHeight: 1.5 }}>
-              PortBand v1.0.0
+              PortParty v1.0.0
             </p>
             <p style={{ fontSize: 11, color: '#71717a', lineHeight: 1.5, marginTop: 4 }}>
-              PortBand is inspired by Portsly by Nico Verbruggen.
+              PortParty is inspired by Portsly by Nico Verbruggen.
             </p>
             <p style={{ fontSize: 11, color: '#71717a', lineHeight: 1.5, marginTop: 4 }}>
               Licensed under the MIT License.

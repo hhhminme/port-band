@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import BandStage from './components/BandStage'
+import CampfireScene from './components/CampfireScene'
 import PortRow from './components/PortRow'
 import LivePulse from './components/LivePulse'
 import Settings from './components/Settings'
@@ -16,8 +16,8 @@ export default function App() {
 
   // Listen for port updates from main process
   useEffect(() => {
-    if (!window.portband) return
-    const unsub = window.portband.onPortsUpdate((data) => {
+    if (!window.portparty) return
+    const unsub = window.portparty.onPortsUpdate((data) => {
       setPorts(data)
     })
     return () => {
@@ -27,8 +27,8 @@ export default function App() {
 
   const handleKill = useCallback((port) => {
     setKillingId(port.id)
-    if (window.portband) {
-      window.portband.killProcess(port.pid)
+    if (window.portparty) {
+      window.portparty.killProcess(port.pid)
     }
     setTimeout(() => {
       setPorts((p) => p.filter((x) => x.id !== port.id))
@@ -37,22 +37,22 @@ export default function App() {
   }, [])
 
   const handleOpen = useCallback((port) => {
-    if (window.portband) {
-      window.portband.openInBrowser(port.port)
+    if (window.portparty) {
+      window.portparty.openInBrowser(port.port)
     }
   }, [])
 
   const handleCopy = useCallback((port) => {
-    if (window.portband) {
-      window.portband.copyUrl(port.port)
+    if (window.portparty) {
+      window.portparty.copyUrl(port.port)
     }
     setCopied(port.id)
     setTimeout(() => setCopied(null), 1500)
   }, [])
 
   const handleKillAll = useCallback(() => {
-    if (window.portband) {
-      window.portband.killAll(ports.map((p) => p.pid))
+    if (window.portparty) {
+      window.portparty.killAll(ports.map((p) => p.pid))
     }
     setPorts([])
     setShowKillAll(false)
@@ -68,6 +68,8 @@ export default function App() {
           borderRadius: 12,
           border: '1px solid #27272a',
           overflow: 'hidden',
+          display: 'flex',
+          flexDirection: 'column',
           fontFamily: '-apple-system, "SF Pro Display", "Segoe UI", sans-serif'
         }}
       >
@@ -100,20 +102,22 @@ export default function App() {
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span style={{ fontSize: 14, fontWeight: 600, color: '#fafafa' }}>PortBand</span>
-          <span
-            style={{
-              fontSize: 10,
-              padding: '1px 8px',
-              borderRadius: 9999,
-              fontWeight: 500,
-              background: count > 0 ? 'rgba(52,211,153,0.1)' : '#27272a',
-              color: count > 0 ? '#34d399' : '#71717a',
-              border: `1px solid ${count > 0 ? 'rgba(52,211,153,0.2)' : '#3f3f46'}`
-            }}
-          >
-            {count} active
-          </span>
+          <span style={{ fontSize: 13, fontWeight: 600, color: '#fafafa' }}>PortParty</span>
+          {count > 0 && (
+            <span
+              style={{
+                fontSize: 10,
+                padding: '1px 8px',
+                borderRadius: 9999,
+                fontWeight: 500,
+                background: 'rgba(251,146,60,0.1)',
+                color: '#FB923C',
+                border: '1px solid rgba(251,146,60,0.2)'
+              }}
+            >
+              Party of {count}
+            </span>
+          )}
         </div>
         <button
           onClick={() => setView('settings')}
@@ -134,35 +138,15 @@ export default function App() {
         </button>
       </div>
 
-      {/* Content */}
-      {count === 0 ? (
-        /* Empty state */
-        <div style={{ padding: '0 8px 8px' }}>
-          <div
-            style={{
-              height: 144,
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              justifyContent: 'center',
-              borderRadius: 8,
-              border: '1px dashed #27272a'
-            }}
-          >
-            <p style={{ fontSize: 12, color: '#52525b' }}>No active ports</p>
-          </div>
-        </div>
-      ) : (
+      {/* Campfire Scene — always visible */}
+      <div style={{ padding: '0 8px 8px' }}>
+        <CampfireScene count={count} ports={ports} />
+      </div>
+
+      {/* Port list */}
+      {count > 0 && (
         <>
-          {/* Band Stage */}
-          <div style={{ padding: '0 8px 8px' }}>
-            <BandStage count={count} />
-          </div>
-
-          {/* Separator */}
           <div style={{ height: 1, background: '#27272a' }} />
-
-          {/* Port list */}
           <div
             style={{
               flex: 1,
@@ -202,7 +186,7 @@ export default function App() {
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           {count > 0 && <LivePulse />}
           <span style={{ fontSize: 10, color: '#52525b' }}>
-            {count > 0 ? 'Watching ports' : 'Idle'}
+            {count > 0 ? 'Campfire burning' : 'Embers cooling'}
           </span>
         </div>
         {count > 0 && (
@@ -220,12 +204,12 @@ export default function App() {
               fontWeight: 500
             }}
           >
-            Kill All
+            Break Camp
           </button>
         )}
       </div>
 
-      {/* Kill All Confirmation Dialog */}
+      {/* Break Camp Confirmation Dialog */}
       {showKillAll && (
         <div
           style={{
@@ -254,10 +238,10 @@ export default function App() {
             onClick={(e) => e.stopPropagation()}
           >
             <h3 style={{ fontSize: 14, fontWeight: 600, color: '#fafafa', marginBottom: 6 }}>
-              Kill all {count} processes?
+              Break camp?
             </h3>
             <p style={{ fontSize: 12, color: '#a1a1aa', marginBottom: 16 }}>
-              This will send SIGTERM to all listening processes.
+              Dismiss all {count} adventurers? This will send SIGTERM to all listening processes.
             </p>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
               <button
@@ -272,7 +256,7 @@ export default function App() {
                   cursor: 'pointer'
                 }}
               >
-                Cancel
+                Keep camping
               </button>
               <button
                 onClick={handleKillAll}
@@ -287,7 +271,7 @@ export default function App() {
                   fontWeight: 500
                 }}
               >
-                Kill All
+                Break Camp
               </button>
             </div>
           </div>

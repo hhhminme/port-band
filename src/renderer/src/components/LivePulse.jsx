@@ -8,7 +8,7 @@ export default function LivePulse() {
           width: '100%',
           height: '100%',
           borderRadius: '50%',
-          backgroundColor: '#34d399',
+          backgroundColor: '#FB923C',
           opacity: 0.75,
           animation: 'ping 1s cubic-bezier(0, 0, 0.2, 1) infinite'
         }}
@@ -20,7 +20,7 @@ export default function LivePulse() {
           width: 8,
           height: 8,
           borderRadius: '50%',
-          backgroundColor: '#10b981'
+          backgroundColor: '#F59E0B'
         }}
       />
       <style>{`

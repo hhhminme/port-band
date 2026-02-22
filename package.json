@@ -1,9 +1,9 @@
 {
-  "name": "portband",
+  "name": "portparty",
   "version": "1.0.0",
-  "description": "macOS menu bar TCP port monitor with headbanging stickman animations",
+  "description": "macOS menu bar TCP port monitor with pixel art campfire adventurers",
   "main": "./out/main/index.js",
-  "author": "PortBand",
+  "author": "PortParty",
   "license": "MIT",
   "scripts": {
     "dev": "electron-vite dev",
@@ -13,9 +13,9 @@
     "build:mac": "npm run build && electron-builder --mac"
   },
   "dependencies": {
-    "@lottiefiles/dotlottie-react": "^0.18.1",
     "@modelcontextprotocol/sdk": "^1.26.0",
-    "electron-store": "^8.2.0"
+    "electron-store": "^8.2.0",
+    "zod": "^4.3.0"
   },
   "devDependencies": {
     "@electron-toolkit/preload": "^3.0.1",
@@ -33,7 +33,6 @@
     "electron": "^28.3.3",
     "electron-builder": "^24.13.3",
     "electron-vite": "^5.0.0",
-    "lottie-react": "^2.4.1",
     "lucide-react": "^0.468.0",
     "postcss": "^8.4.49",
     "react": "^18.3.1",

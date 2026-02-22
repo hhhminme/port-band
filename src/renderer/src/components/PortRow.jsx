@@ -93,7 +93,7 @@ function PortRow({ port, onKill, onOpen, onCopy, killing, justCopied }) {
           <button
             onClick={() => onCopy(port)}
             aria-label="Copy URL"
-            style={{ ...btnStyle, color: isCopied ? '#34d399' : '#52525b' }}
+            style={{ ...btnStyle, color: isCopied ? '#FB923C' : '#52525b' }}
           >
             {isCopied ? <CheckIcon size={12} /> : <CopyIcon size={12} />}
           </button>

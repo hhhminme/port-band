@@ -1,55 +1,94 @@
 import { Tray, nativeImage, BrowserWindow } from 'electron'
-import { readFileSync } from 'fs'
-import { join } from 'path'
-import catAnimation from './cat-animation.json'
 
 let offscreenWindow = null
-let cachedFrames = []
-let totalFrames = 0
+let cachedFrames = {} // { intensity: [nativeImage, ...] }
+
+function getFireIntensity(count) {
+  if (count === 0) return 0
+  if (count <= 2) return 1
+  if (count <= 4) return 2
+  if (count <= 7) return 3
+  return 4
+}
 
 async function initOffscreenWindow() {
-  // Read lottie-web source
-  const lottieWebPath = join(
-    __dirname,
-    '../../node_modules/lottie-web/build/player/lottie.min.js'
-  )
-  let lottieJs = ''
-  try {
-    lottieJs = readFileSync(lottieWebPath, 'utf-8')
-  } catch (e) {
-    console.error('[tray] Failed to read lottie-web:', e.message)
-    return
+  const html = `<!DOCTYPE html>
+<html><head></head><body>
+<canvas id="c" width="36" height="36"></canvas>
+<script>
+window.__generateFrames = function() {
+  var canvas = document.getElementById('c');
+  var ctx = canvas.getContext('2d');
+  var result = {};
+
+  for (var intensity = 0; intensity < 5; intensity++) {
+    result[intensity] = [];
+    for (var f = 0; f < 4; f++) {
+      ctx.clearRect(0, 0, 36, 36);
+      drawCampfire(ctx, 18, 20, intensity, f);
+      result[intensity].push(canvas.toDataURL('image/png'));
+    }
+  }
+  return result;
+};
+
+function drawCampfire(ctx, cx, cy, intensity, frame) {
+  // Logs
+  ctx.fillStyle = '#5C3D1E';
+  for (var i = -7; i <= 7; i++) {
+    ctx.fillRect(cx + i, cy + Math.round(i * 0.25) + 6, 2, 2);
+    ctx.fillRect(cx + i, cy - Math.round(i * 0.25) + 6, 2, 2);
+  }
+  ctx.fillStyle = '#3D2510';
+  for (var i = -6; i <= 6; i++) {
+    ctx.fillRect(cx + i, cy + Math.round(i * 0.25) + 7, 1, 1);
   }
 
-  // Build a self-contained HTML page with lottie-web and animation data baked in
-  const animJson = JSON.stringify(catAnimation)
-  const html = `<!DOCTYPE html>
-<html><head><script>${lottieJs}<\/script></head>
-<body>
-<div id="c" style="width:36px;height:36px"></div>
-<script>
-  const anim = lottie.loadAnimation({
-    container: document.getElementById('c'),
-    animationData: ${animJson},
-    renderer: 'canvas',
-    loop: false,
-    autoplay: false
-  });
-  anim.addEventListener('DOMLoaded', () => {
-    // Re-draw each frame onto a 36x36 output canvas for tray icon
-    const srcCanvas = document.querySelector('#c canvas');
-    const out = document.createElement('canvas');
-    out.width = 36;
-    out.height = 36;
-    window.__outCtx = out.getContext('2d');
-    window.__srcCanvas = srcCanvas;
-    window.__outCanvas = out;
-    window.__lottieReady = true;
-    window.__totalFrames = anim.totalFrames;
-    window.__anim = anim;
-  });
-<\/script>
-</body></html>`
+  if (intensity === 0) {
+    var embers = [[-3, 5], [0, 4], [3, 5], [-1, 6], [2, 6]];
+    for (var e = 0; e < embers.length; e++) {
+      ctx.fillStyle = (frame + e) % 3 === 0 ? '#FF6B00' : '#B34700';
+      ctx.fillRect(cx + embers[e][0], cy + embers[e][1], 2, 2);
+    }
+    return;
+  }
+
+  var heights = [0, 6, 10, 14, 20];
+  var widths = [0, 3, 4, 6, 8];
+  var h = heights[intensity];
+  var w = widths[intensity];
+  var seed = frame * 7919;
+
+  for (var row = 0; row < h; row++) {
+    var t = row / h;
+    var rowW = Math.max(1, Math.round(w * (1 - t * t)));
+    var flicker = Math.round(Math.sin(seed * 0.3 + row * 0.7) * 1.5);
+
+    for (var col = -rowW; col <= rowW; col++) {
+      var dist = Math.abs(col) / (rowW || 1);
+      if (dist < 0.3 && t < 0.5) ctx.fillStyle = '#FFF4CC';
+      else if (dist < 0.6 && t < 0.7) ctx.fillStyle = '#FFB800';
+      else ctx.fillStyle = '#FF6B00';
+
+      var rng = ((seed + row * 10 + col + 12345) >>> 0) % 100;
+      if (dist > 0.7 && rng > 55) continue;
+
+      ctx.fillRect(cx + col * 2 + flicker, cy - row * 2 + 4, 2, 2);
+    }
+  }
+
+  if (intensity >= 3) {
+    for (var s = 0; s < intensity - 1; s++) {
+      var sx = cx + Math.round(Math.sin(frame * 2.1 + s * 3.7) * (w + 2));
+      var sy = cy - h * 2 + 4 - s * 3 - (frame % 3);
+      if (sy > 0) {
+        ctx.fillStyle = '#FFD700';
+        ctx.fillRect(sx, sy, 1, 1);
+      }
+    }
+  }
+}
+<\/script></body></html>`
 
   offscreenWindow = new BrowserWindow({
     width: 36,
@@ -66,63 +105,36 @@ async function initOffscreenWindow() {
   )
 }
 
-async function renderLottieFrames() {
+async function renderCampfireFrames() {
   if (!offscreenWindow || offscreenWindow.isDestroyed()) return
 
-  // Wait for lottie to be ready
-  const ready = await offscreenWindow.webContents.executeJavaScript(`
-    new Promise(resolve => {
-      if (window.__lottieReady) return resolve(true);
-      const check = setInterval(() => {
-        if (window.__lottieReady) { clearInterval(check); resolve(true); }
-      }, 50);
-      setTimeout(() => { clearInterval(check); resolve(false); }, 5000);
-    })
-  `)
+  const framesData = await offscreenWindow.webContents.executeJavaScript(
+    'window.__generateFrames()'
+  )
 
-  if (!ready) {
-    console.error('[tray] Lottie did not become ready in time')
-    return
+  for (let intensity = 0; intensity < 5; intensity++) {
+    cachedFrames[intensity] = framesData[intensity].map((dataUrl) => {
+      const img = nativeImage.createFromDataURL(dataUrl)
+      return img.resize({ width: 18, height: 18 })
+    })
   }
 
-  const frames = await offscreenWindow.webContents.executeJavaScript(`
-    (() => {
-      const results = [];
-      const ctx = window.__outCtx;
-      const src = window.__srcCanvas;
-      const out = window.__outCanvas;
-      for (let i = 0; i < window.__totalFrames; i++) {
-        window.__anim.goToAndStop(i, true);
-        ctx.clearRect(0, 0, 36, 36);
-        ctx.drawImage(src, 0, 0, 36, 36);
-        results.push(out.toDataURL('image/png'));
-      }
-      return results;
-    })()
-  `)
-
-  console.log('[tray] Rendered', frames.length, 'cat frames')
-  cachedFrames = frames.map((dataUrl) => {
-    const img = nativeImage.createFromDataURL(dataUrl)
-    // Resize to 18x18 so macOS treats the 36px source as @2x Retina
-    return img.resize({ width: 18, height: 18 })
-  })
-  totalFrames = cachedFrames.length
+  const total = Object.values(cachedFrames).reduce((s, a) => s + a.length, 0)
+  console.log('[tray] Rendered', total, 'campfire frames (5 intensities x 4 frames)')
 }
 
 export async function createTray(toggleCallback) {
   await initOffscreenWindow()
   try {
-    await renderLottieFrames()
+    await renderCampfireFrames()
   } catch (e) {
-    console.error('[tray] renderLottieFrames failed:', e.message)
+    console.error('[tray] renderCampfireFrames failed:', e.message)
   }
 
-  const icon =
-    cachedFrames.length > 0 ? cachedFrames[0] : nativeImage.createEmpty()
+  const icon = cachedFrames[0]?.[0] || nativeImage.createEmpty()
 
   const tray = new Tray(icon)
-  tray.setToolTip('PortBand')
+  tray.setToolTip('PortParty')
   tray.setTitle(' 0')
 
   tray.on('click', () => {
@@ -132,12 +144,15 @@ export async function createTray(toggleCallback) {
   return tray
 }
 
-export async function updateTrayIcon(tray, count, frame) {
+export function updateTrayIcon(tray, count, frame) {
   if (!tray || tray.isDestroyed()) return
-  if (totalFrames === 0) return
 
-  const idx = frame % totalFrames
-  const img = cachedFrames[idx]
+  const intensity = getFireIntensity(count)
+  const frames = cachedFrames[intensity]
+  if (!frames || frames.length === 0) return
+
+  const idx = frame % frames.length
+  const img = frames[idx]
   if (img) {
     tray.setImage(img)
   }
