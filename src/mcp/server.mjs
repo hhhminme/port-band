@@ -11,6 +11,7 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { exec } from 'child_process'
 import { readFileSync } from 'fs'
 import path from 'path'
+import { z } from 'zod'
 
 // ── Port scanning (inlined from port-scanner.js) ──
 
@@ -217,11 +218,10 @@ server.tool(
   'list_ports',
   'List all TCP listening ports with optional service enrichment (project name, framework, cwd)',
   {
-    includeEnrichment: {
-      type: 'boolean',
-      description: 'Include enriched service info (project name, framework, cwd). Slower but more detailed.',
-      default: true
-    }
+    includeEnrichment: z
+      .boolean()
+      .default(true)
+      .describe('Include enriched service info (project name, framework, cwd). Slower but more detailed.')
   },
   async ({ includeEnrichment = true }) => {
     try {
@@ -248,14 +248,8 @@ server.tool(
   'get_port_details',
   'Get detailed info about a specific port or PID',
   {
-    port: {
-      type: 'number',
-      description: 'Port number to look up'
-    },
-    pid: {
-      type: 'number',
-      description: 'PID to look up'
-    }
+    port: z.number().optional().describe('Port number to look up'),
+    pid: z.number().optional().describe('PID to look up')
   },
   async ({ port, pid }) => {
     if (port === undefined && pid === undefined) {
@@ -302,19 +296,12 @@ server.tool(
   'kill_process',
   'Kill a process by PID or port number. Sends SIGTERM first, then SIGKILL after 2 seconds if still alive.',
   {
-    pid: {
-      type: 'number',
-      description: 'PID of the process to kill'
-    },
-    port: {
-      type: 'number',
-      description: 'Port number — will find and kill the process listening on this port'
-    },
-    signal: {
-      type: 'string',
-      description: 'Signal to send (default: SIGTERM). Use SIGKILL for force kill.',
-      default: 'SIGTERM'
-    }
+    pid: z.number().optional().describe('PID of the process to kill'),
+    port: z.number().optional().describe('Port number — will find and kill the process listening on this port'),
+    signal: z
+      .string()
+      .default('SIGTERM')
+      .describe('Signal to send (default: SIGTERM). Use SIGKILL for force kill.')
   },
   async ({ pid, port, signal = 'SIGTERM' }) => {
     try {
@@ -396,11 +383,9 @@ server.tool(
   'find_service',
   'Search for services by name, project name, framework, or port number',
   {
-    query: {
-      type: 'string',
-      description:
-        'Search query — matches against service name, project name, framework, port number, and cwd'
-    }
+    query: z
+      .string()
+      .describe('Search query — matches against service name, project name, framework, port number, and cwd')
   },
   async ({ query }) => {
     try {
